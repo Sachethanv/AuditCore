@@ -1,0 +1,40 @@
+{
+  "name": "AuditCore hackathon rubric v3",
+  "version": 3,
+  "note": "v3 assumes most teams use AI coding tools. Clean code, tests and tidy structure are what those tools produce by default, so polish criteria are CAPPED for the AI reviewer (baseline_cap) and the weight moves to system design, completeness and innovation. Documentation is not scored. Criteria with ai_assisted=true are pre-scored from the repository by AuditCore; the rest need a human judge. Scores are 0-10. Organizers should edit weights per event.",
+  "criteria": [
+    {"id": "system_design", "weight": 25, "ai_assisted": true, "title": "System design & architecture",
+     "description": "Not 'is the code clean' (AI tools write clean code) but 'were deliberate design decisions made?'. Look for: a data model that fits the problem, sensible component boundaries, a justified choice of storage/queue/cache/API style, how state and failures are handled, how the parts scale or degrade, integration of several real components, and trade-offs that show the team understood the problem rather than accepting a default scaffold. List each decision you can evidence in design_decisions. Scaffold defaults (a generated CRUD app, the default framework layout, a single API call wrapped in a route) are the BASELINE and earn at most 5. Scores above 5 need verified evidence of specific decisions; the AI reviewer's maximum is 8, and 9-10 are for human judges after they have questioned the team.",
+     "baseline": 5, "cap_formula": "5 + number of verified design_decisions, at most 8",
+     "anchors": {"2": "Boilerplate or a thin wrapper around one API; no visible design choices.", "5": "A generic, working scaffold: sensible layout, but every choice looks like a framework default.", "8": "Several specific, evidenced decisions (data model, boundaries, failure handling, integration) that fit this problem."}},
+    {"id": "innovation_creativity", "weight": 25, "ai_assisted": false, "title": "Innovation & creativity",
+     "description": "Novelty compared with existing solutions: a new idea, an unusual combination, or a clearly better way to do a known thing. Judged by a human. AuditCore supplies the 'Where this stands' landscape note (closest existing projects and how this one differs) as evidence, never as a score."},
+    {"id": "completeness", "weight": 15, "ai_assisted": true, "title": "Completeness & working end to end",
+     "description": "Evidence that one complete user path actually works: routes/handlers wired to real logic, persistence, error states where relevant, run/deploy configuration. Penalize hard-coded or pre-loaded data that only works for a demo, placeholder content, and features that are claimed but not in the code.",
+     "anchors": {"2": "Parts do not connect, data is hard-coded or fake.", "5": "The main flow appears wired end to end but with gaps or demo-only data.", "8": "Full flow with real persistence/integration, error states, and run configuration."}},
+    {"id": "impact_usefulness", "weight": 10, "ai_assisted": false, "title": "Impact & usefulness",
+     "description": "A clearly defined user, a real problem, and plausible adoption. Judged by a human."},
+    {"id": "demo_presentation", "weight": 10, "ai_assisted": false, "title": "Demo & presentation",
+     "description": "Live demo works, clear story, realistic data, honest answers to the design questions. Judged live by a human."},
+    {"id": "code_quality", "weight": 5, "ai_assisted": true, "title": "Code quality", "baseline_cap": 7,
+     "description": "Structure, modularity and readability. AI tools make this look good by default, so the AI reviewer cannot score above 7; judges may.",
+     "anchors": {"2": "Giant files, copy-paste, unclear naming.", "5": "Understandable, some structure, some duplication.", "7": "Clean modules and consistent style (typical of AI-assisted code)."}},
+    {"id": "robustness", "weight": 5, "ai_assisted": true, "title": "Robustness & error handling", "baseline_cap": 7,
+     "description": "Input validation, failure handling, tests that test something real. Generated boilerplate tests and try/except wrappers are the baseline; the AI reviewer cannot score above 7.",
+     "anchors": {"2": "No validation or error handling.", "5": "Basic error handling on main paths; few or no tests.", "7": "Validated inputs, handled failures, meaningful tests."}},
+    {"id": "security_config", "weight": 5, "ai_assisted": true, "title": "Security & secrets", "baseline_cap": 8,
+     "description": "Secrets handled via environment variables, no committed credentials, no obvious injection/XSS. Static findings provided are facts. Committed secrets are a real problem and are scored here and flagged; missing documentation about them is not.",
+     "anchors": {"2": "Committed secrets or obvious injection holes.", "5": "No leaked secrets; some unsafe patterns.", "8": "Config via environment; no unsafe patterns found."}}
+  ],
+  "red_flags_for_judges": [
+    "Slides or mockups with no working code behind them",
+    "Hard-coded or pre-loaded data so the demo only works for one input",
+    "Placeholder / lorem ipsum content",
+    "A thin wrapper around a single third-party API presented as the product",
+    "Elaborate UI with little backend or logic behind it",
+    "Pitch claims that the code does not support",
+    "Work that predates the event presented as built during it",
+    "Generic clone ('another todo app', 'another chatbot') with no differentiation",
+    "The team cannot explain why they chose their data model, storage or architecture"
+  ]
+}

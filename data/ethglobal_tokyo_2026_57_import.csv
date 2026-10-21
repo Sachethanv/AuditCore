@@ -1,0 +1,58 @@
+team_id,team_name,repo_url,members,project_title,description,problem,track,label,prize
+T01,OniBlock,https://github.com/oniblok/oniblock,oniblok,OniBlock,OniBlock - ETHGlobal Tokyo 2026 project,,,prized,Uniswap Foundation - Best Uniswap Stack Contribution (3rd)
+T02,DayTrader,https://github.com/ETHTokyo2026-MODY/project-tokyo,ETHTokyo2026-MODY,DayTrader,DayTrader - ETHGlobal Tokyo 2026 project,,,prized,Curvegrid - Best RWA Tokenization Project (winner)
+T03,Lortnoc Tahc,https://github.com/forever8896/lortnoc_tahc,forever8896,Lortnoc Tahc,Lortnoc Tahc - ETHGlobal Tokyo 2026 project,,,prized,ENS - Best Integration of ENSv2 (2nd); World - Best IDKit Use Case
+T04,Radius,https://github.com/LeoFranklin015/ethtokyo-2026,LeoFranklin015,Radius,Radius - ETHGlobal Tokyo 2026 project,,,prized,ENS - Best Integration of ENSv2 (1st)
+T05,Kagi Wallet,https://github.com/team-somehow/kagi-wallet,team-somehow,Kagi Wallet,Kagi Wallet - ETHGlobal Tokyo 2026 project,,,prized,Intercepta - Safe Agent-to-Agent Payments with x402 (1st); Curvegrid - Best AI Agent Project
+T06,Wamia,https://github.com/HediKharouf0/Wamia,HediKharouf0,Wamia,Wamia - ETHGlobal Tokyo 2026 project,,,prized,1inch - Build an Aqua App (2nd)
+T07,Surety,https://github.com/Rohitamalraj/Surety,Rohitamalraj,Surety,Surety - ETHGlobal Tokyo 2026 project,,,prized,World - Best Use of World ID for Agents
+T08,Relay,https://github.com/derek2403/relay,derek2403,Relay,Relay - ETHGlobal Tokyo 2026 project,,,prized,ENS - Best Use of ENSv2 (1st)
+T09,XSwap,https://github.com/Scannty/eth-blinks,Scannty,XSwap,XSwap - ETHGlobal Tokyo 2026 project,,,prized,Uniswap Foundation - Best Uniswap Stack Contribution (2nd); Intercepta
+T10,AntiScalper Protocol,https://github.com/altaga/AntiScalper-Protocol,altaga,AntiScalper Protocol,AntiScalper Protocol - ETHGlobal Tokyo 2026 project,,,prized,"Sui - DeFi, Payments, Agents track (2nd)"
+T11,Placed,https://github.com/dzmbs/placed,dzmbs,Placed,Placed - ETHGlobal Tokyo 2026 project,,,prized,World - Best Use of IDKit (winner)
+T12,Tide,https://github.com/asengupta07/tide,asengupta07,Tide,Tide - ETHGlobal Tokyo 2026 project,,,unclear,list page showed a prize label but the project page lists none; excluded from statistics
+T13,ScalpLess,https://github.com/Shanthan2307/scalpless,Shanthan2307,ScalpLess,ScalpLess - ETHGlobal Tokyo 2026 project,,,none,
+T14,Iceberg,https://github.com/SudeepGowda55/Iceberg,SudeepGowda55,Iceberg,Iceberg - ETHGlobal Tokyo 2026 project,,,none,
+T15,Tap Pay,https://github.com/gitaugakwa/tap,gitaugakwa,Tap Pay,Tap Pay - ETHGlobal Tokyo 2026 project,,,none,
+T16,Waterline,https://github.com/FlyingWHR/waterline,FlyingWHR,Waterline,Waterline - ETHGlobal Tokyo 2026 project,,,none,
+T17,Axis,https://github.com/janhavidhepe89-pixel/AXIS,janhavidhepe89-pixel,Axis,Axis - ETHGlobal Tokyo 2026 project,,,none,
+T18,Kismet,https://github.com/kismetcasa/Kismet,kismetcasa,Kismet,Kismet - ETHGlobal Tokyo 2026 project,,,none,
+T19,Tripwire,https://github.com/sigint-zero/tripwire,sigint-zero,Tripwire,Tripwire - ETHGlobal Tokyo 2026 project,,,none,
+T20,KawaiPay,https://github.com/dumprahul/kawaipay,dumprahul,KawaiPay,KawaiPay - ETHGlobal Tokyo 2026 project,,,none,
+T21,Ninja Check,https://github.com/tokyoksc/ninja-scan,tokyoksc,Ninja Check,Ninja Check - ETHGlobal Tokyo 2026 project,,,none,
+T22,DSAP Protocol,https://github.com/prathamesh-mutkure/agent-latch,prathamesh-mutkure,DSAP Protocol,DSAP Protocol - ETHGlobal Tokyo 2026 project,,,none,
+T24,My Agent Ohana,https://github.com/shakaleikaumaka/my-agent-ohana,shakaleikaumaka,My Agent Ohana,My Agent Ohana - ETHGlobal Tokyo 2026 project,,,none,
+T25,RateSpace,https://github.com/AaronTan11/ratespace,AaronTan11,RateSpace,RateSpace - ETHGlobal Tokyo 2026 project,,,none,
+T26,Mental Poker,https://github.com/henrikkv/poker,henrikkv,Mental Poker,Mental Poker - ETHGlobal Tokyo 2026 project,,,none,
+T27,Dedan,https://github.com/UYUYANMARUL/dedan,UYUYANMARUL,Dedan,Dedan - ETHGlobal Tokyo 2026 project,,,none,
+T28,AegisNet,https://github.com/shriyashsoni/aegisnet.eth,shriyashsoni,AegisNet,AegisNet - ETHGlobal Tokyo 2026 project,,,none,
+T29,nacre,https://github.com/Nishu0/nacre,Nishu0,nacre,nacre - ETHGlobal Tokyo 2026 project,,,none,
+T30,Buckets,https://github.com/SHLOK333/Spendkey,SHLOK333,Buckets,Buckets - ETHGlobal Tokyo 2026 project,,,none,
+T31,Bonded,https://github.com/Narayanan-D-05/Bonded,Narayanan-D-05,Bonded,Bonded - ETHGlobal Tokyo 2026 project,,,none,
+T32,Agent's List,https://github.com/mi1kandcookies/agents-list,mi1kandcookies,Agent's List,Agent's List - ETHGlobal Tokyo 2026 project,,,none,
+T33,Dead or Alive Agent,https://github.com/tricodex/doa-agent,tricodex,Dead or Alive Agent,Dead or Alive Agent - ETHGlobal Tokyo 2026 project,,,none,
+T34,Swish,https://github.com/Khalid-000-ME/swish,Khalid-000-ME,Swish,Swish - ETHGlobal Tokyo 2026 project,,,none,
+T35,Cypher Brain,https://github.com/Masashi-Ono0611/cypher-brain,Masashi-Ono0611,Cypher Brain,Cypher Brain - ETHGlobal Tokyo 2026 project,,,none,
+T36,yuin,https://github.com/agoston0x/yuin,agoston0x,yuin,yuin - ETHGlobal Tokyo 2026 project,,,none,
+T37,AICity,https://github.com/kon-rad/ethtokyo2026,kon-rad,AICity,AICity - ETHGlobal Tokyo 2026 project,,,none,
+T38,MynaHealth,https://github.com/uooooo/myna-health,uooooo,MynaHealth,MynaHealth - ETHGlobal Tokyo 2026 project,,,none,
+T39,Levarac,https://github.com/levarac/mizar,levarac,Levarac,Levarac - ETHGlobal Tokyo 2026 project,,,none,
+T40,Kakunin,https://github.com/SamirStream/kakunin,SamirStream,Kakunin,Kakunin - ETHGlobal Tokyo 2026 project,,,none,
+T41,suica os,https://github.com/fabianferno/ethglobal-tokyo-2026,fabianferno,suica os,suica os - ETHGlobal Tokyo 2026 project,,,none,lists prize tracks entered but no prize won
+T42,Agent Bank,https://github.com/takupeso/agent-bank,takupeso,Agent Bank,Agent Bank - ETHGlobal Tokyo 2026 project,,,none,
+T43,Phinary,https://github.com/oynozan/phinary,oynozan,Phinary,Phinary - ETHGlobal Tokyo 2026 project,,,none,
+T44,Zigel,https://github.com/aspiringsecurity/EthTransport,aspiringsecurity,Zigel,Zigel - ETHGlobal Tokyo 2026 project,,,none,
+T45,Hank0,https://github.com/bertankofon/Hanko,bertankofon,Hank0,Hank0 - ETHGlobal Tokyo 2026 project,,,none,
+T46,IC Pay,https://github.com/akashbiswas0/IC-Pay,akashbiswas0,IC Pay,IC Pay - ETHGlobal Tokyo 2026 project,,,none,
+T47,MD Transfer Protocol,https://github.com/capsulizers/mdtp,capsulizers,MD Transfer Protocol,MD Transfer Protocol - ETHGlobal Tokyo 2026 project,,,none,
+T49,Plain Safe,https://github.com/gskril/plainsafe,gskril,Plain Safe,Plain Safe - ETHGlobal Tokyo 2026 project,,,none,
+T50,TradeBridge,https://github.com/blackduff32/TradeBridge,blackduff32,TradeBridge,TradeBridge - ETHGlobal Tokyo 2026 project,,,none,
+T51,hanko,https://github.com/sunagi/hanko,sunagi,hanko,hanko - ETHGlobal Tokyo 2026 project,,,none,
+T52,Handshake,https://github.com/George-WM/handshake,George-WM,Handshake,Handshake - ETHGlobal Tokyo 2026 project,,,none,
+T54,consent-ledger,https://github.com/sakuraozation/consent-ledger,sakuraozation,consent-ledger,consent-ledger - ETHGlobal Tokyo 2026 project,,,none,
+T55,BioAgent,https://github.com/Polonity/ethglobaltokyo2026-bio-agent,Polonity,BioAgent,BioAgent - ETHGlobal Tokyo 2026 project,,,none,
+T56,Risksir,https://github.com/angelphoon7/ethonline20266,angelphoon7,Risksir,Risksir - ETHGlobal Tokyo 2026 project,,,none,
+T57,Sodera,https://github.com/garguelles/sodera,garguelles,Sodera,Sodera - ETHGlobal Tokyo 2026 project,,,none,
+T58,Fan Fare,https://github.com/TheGreatFellow/fan-fare-eth-tokyo,TheGreatFellow,Fan Fare,Fan Fare - ETHGlobal Tokyo 2026 project,,,none,
+T59,Kido,https://github.com/austinjeremiah/Kido,austinjeremiah,Kido,Kido - ETHGlobal Tokyo 2026 project,,,none,
+T61,Accord,https://github.com/hrsh22/ethtokyo26,hrsh22,Accord,Accord - ETHGlobal Tokyo 2026 project,,,none,

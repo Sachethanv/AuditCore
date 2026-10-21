@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+sqlalchemy
+pypdf
+# optional: psycopg[binary]   (only if DATABASE_URL points at Postgres)
+# tests:    pytest httpx python-pptx reportlab

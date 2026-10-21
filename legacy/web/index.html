@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AuditCore</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="rail">
+    <a class="brand" href="#/quick"><i></i>AuditCore</a>
+    <nav class="nav" id="nav" aria-label="Spaces"></nav>
+    <div class="foot" id="health"></div>
+  </aside>
+  <main id="main" tabindex="-1"></main>
+</div>
+<dialog id="dlg"></dialog>
+
+<script src="/static/shared.js"></script>
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const store = { get(k){ try { return localStorage.getItem(k) } catch { return null } }, set(k,v){ try { localStorage.setItem(k,v) } catch {} } };
+let health = {}, events = [], timer = null;
+const clearPoll = () => { if (timer) clearInterval(timer); timer = null; };
+const setPoll = (fn, ms = 2500) => { clearPoll(); timer = setInterval(fn, ms); };
+// Never let an automatic refresh overwrite something a person is typing.
+const userIsEditing = () => { const a = document.activeElement; return !!(a && $("#main").contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== "checkbox" && a.type !== "file"); };
+const fileB64 = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = () => rej(new Error("Could not read the file")); r.readAsDataURL(f); });
+const toLocalInput = s => { if (!s) return ""; const d = new Date(s), p = n => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
+const fromLocalInput = v => v ? new Date(v).toISOString() : null;
+
+async function api(path, opts = {}) {
+  const headers = { "Content-Type": "application/json" };
+  const t = store.get("ac_token"); if (t) headers.Authorization = "Bearer " + t;
+  const r = await fetch(path, { ...opts, headers, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  if (r.status === 401) { await askToken(); return api(path, opts); }
+  if (r.status === 204) return null;
+  const ct = r.headers.get("content-type") || "";
+  const data = ct.includes("json") ? await r.json() : await r.text();
+  if (!r.ok) throw new Error(typeof data === "object" ? (typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail)) : data);
+  return data;
+}
+function askToken() {
+  return new Promise(res => {
+    const d = $("#dlg");
+    d.innerHTML = `<form method="dialog"><h3>This server needs an access token</h3><p class="muted">Ask whoever runs AuditCore for the token (the AUDITCORE_TOKEN setting).</p>
+      <label>Access token<input id="tok" type="password" autocomplete="off" required></label><p><button>Continue</button></p></form>`;
+    d.addEventListener("close", () => { store.set("ac_token", $("#tok").value.trim()); res(); }, { once: true });
+    d.showModal();
+  });
+}
+const toast = (msg, err) => { const m = $("#main"); const n = document.createElement("div"); n.className = "notice" + (err ? " err" : ""); n.setAttribute("role", err ? "alert" : "status"); n.textContent = msg; m.prepend(n); setTimeout(() => n.remove(), err ? 9000 : 4000); };
+const repoName = u => (u || "").replace("https://github.com/", "");
+const statusPill = e => !e ? `<span class="pill">Not evaluated</span>` :
+  e.status === "queued" ? `<span class="pill run">Queued</span>` : e.status === "running" ? `<span class="pill run">Analysing…</span>` :
+  e.status === "failed" ? `<span class="pill high" title="${esc(e.error)}">Failed</span>` : "";
+const flagPills = (h, m) => (h ? `<span class="pill high">${h} high</span> ` : "") + (m ? `<span class="pill medium">${m} medium</span>` : "") || `<span class="muted tiny">none</span>`;
+const scoreCell = s => s == null ? `<span class="muted">–</span>` : `<div class="scorecell"><span>${s}</span><div class="bar"><b style="width:${Math.max(0, Math.min(100, s))}%"></b></div></div>`;
+const members = str => str.split(";").map(s => s.trim()).filter(Boolean).map(s => { const m = s.match(/^(.*?)\s*\(\s*@?([\w-]+)\s*\)$/); return m ? { name: m[1], github: m[2] } : { name: s }; });
+const membersStr = ms => (ms || []).map(m => m.name + (m.github ? ` (@${m.github})` : "")).join("; ");
+const copyText = async (text, inputEl) => { try { await navigator.clipboard.writeText(text); toast("Link copied"); } catch { if (inputEl) { inputEl.select(); } toast("Select the link and copy it (Ctrl+C)"); } };
+function main(html) { $("#main").innerHTML = html; }
+
+/* ---------- nav ---------- */
+async function renderNav(route) {
+  try { events = await api("/api/events"); } catch { events = []; }
+  const evId = route[0] === "event" ? +route[1] : route[0] === "team" ? (window.__teamEvent || 0) : 0;
+  $("#nav").innerHTML = `
+    <a href="#/quick" ${route[0] === "quick" || route[0] === "eval" ? 'aria-current="page"' : ""}>Quick check<small>One repository</small></a>
+    <a href="#/events" ${route[0] === "events" || route[0] === "event" || route[0] === "team" ? 'aria-current="page"' : ""}>Hackathons<small>Teams, judges, leaderboard</small></a>
+    <div class="sub">${events.map(e => `<a href="#/event/${e.id}" ${evId === e.id ? 'aria-current="page"' : ""}>${esc(e.name)}</a>`).join("")}</div>`;
+}
+
+/* ---------- quick check ---------- */
+async function viewQuick() {
+  main(`<h1>Check a repository</h1>
+    <p class="lede">Paste a public GitHub link. You get commit-history flags, leaked-secret and security findings, and a rubric review that cites the code it is based on.</p>
+    <form class="inline" id="qf">
+      <label class="grow">GitHub repository<input name="repo_url" placeholder="https://github.com/owner/repo" required inputmode="url"></label>
+      <button>Evaluate</button>
+    </form>
+    <details><summary>Hackathon dates (turns on the “started before the event” check)</summary>
+      <form class="inline" id="qd" onsubmit="return false"><label>Starts<input type="datetime-local" name="s"></label><label>Ends<input type="datetime-local" name="e"></label></form>
+    </details>
+    <details><summary>About the project (optional: checks the pitch against the code)</summary>
+      <div id="qa">
+        <div class="field"><label for="qt">Project title</label><input id="qt" maxlength="200"></div>
+        <div class="field"><label for="qs">What is it about?</label><textarea id="qs" placeholder="Two or three sentences on what the project does"></textarea></div>
+        <div class="field"><label for="qp">What problem does it solve?</label><textarea id="qp" placeholder="Who has the problem, and why it matters"></textarea></div>
+        <div class="field"><label for="qdk">Pitch deck <small>(.pptx or PDF, up to 20 MB)</small></label><input id="qdk" type="file" accept=".pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation"></div>
+      </div>
+    </details>
+    <h2>Recent checks</h2><div id="list"></div>`);
+  $("#qf").onsubmit = async ev => {
+    ev.preventDefault(); const b = $("#qf button"); b.disabled = true;
+    try {
+      const dt = n => fromLocalInput($("#qd")[n].value);
+      const body = { repo_url: new FormData(ev.target).get("repo_url"), hackathon_start: dt("s"), hackathon_end: dt("e"),
+        title: $("#qt").value, summary: $("#qs").value, problem_statement: $("#qp").value };
+      const f = $("#qdk").files[0]; if (f) body.deck = { filename: f.name, data_b64: await fileB64(f) };
+      const e = await api("/api/evaluations", { method: "POST", body });
+      location.hash = "#/eval/" + e.id;
+    } catch (x) { toast(x.message, true); b.disabled = false; }
+  };
+  const load = async () => {
+    const rows = await api("/api/evaluations");
+    $("#list").innerHTML = rows.length ? `<table><thead><tr><th>Repository</th><th>Technical score</th><th>Flags</th><th>When</th></tr></thead><tbody>${rows.map(e =>
+      `<tr class="link" data-go="#/eval/${e.id}"><td><a href="#/eval/${e.id}">${esc(repoName(e.repo_url))}</a></td><td>${e.status === "done" ? scoreCell(e.overall_score) : statusPill(e)}</td><td>${e.status === "done" ? flagPills(e.high_flags, 0) : ""}</td><td class="muted">${ago(e.created_at)}</td></tr>`).join("")}</tbody></table>`
+      : `<div class="empty">No checks yet. Paste a repository link above to run your first one.</div>`;
+    if (!rows.some(r => r.status === "queued" || r.status === "running")) clearPoll();
+  };
+  await load(); setPoll(load);
+}
+
+async function viewEval(id) {
+  const load = async () => {  // returns true while the evaluation is still running
+    const e = await api("/api/evaluations/" + id);
+    if (e.status === "queued" || e.status === "running") {
+      main(`<div class="crumb"><a href="#/quick">Quick check</a></div><h1>${esc(repoName(e.repo_url))}</h1>
+        <div class="notice" role="status">${e.status === "queued" ? "Waiting for a free worker…" : "Cloning the repository and analysing it. Large repositories and the Gemini review take up to a minute or two."}</div>`);
+      return true;
+    }
+    clearPoll();
+    if (e.status === "failed") { main(`<div class="crumb"><a href="#/quick">Quick check</a></div><h1>${esc(repoName(e.repo_url))}</h1><div class="notice err">${esc(e.error)}</div><p><a class="btn" href="#/quick">Try another repository</a></p>`); return false; }
+    main(`<div class="crumb"><a href="#/quick">Quick check</a></div>` + renderReport(e.result, e));
+    return false;
+  };
+  if (await load()) setPoll(load, 2000);
+}
+
+/* ---------- report ---------- */
+function renderReport(r, e) {
+  const rv = r.review, byId = Object.fromEntries((r.rubric.criteria || []).map(c => [c.id, c]));
+  const li = a => (a || []).map(x => `<li>${esc(x)}</li>`).join("");
+  const flags = r.integrity_flags || [];
+  const ev = rv.evidence_stats || {};
+  const crit = (rv.criteria || []).map(c => {
+    const meta = byId[c.id] || { title: c.id, weight: "" };
+    const anchors = meta.anchors ? `<details><summary>What 2, 5 and 8 look like</summary><dl class="kv">${Object.entries(meta.anchors).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl></details>` : "";
+    return `<section class="crit"><header><h3>${esc(meta.title)} <span class="muted tiny">weight ${esc(meta.weight)}</span></h3><span class="sc">${c.score}<small class="muted">/10</small></span></header>
+      <div class="ruler" role="img" aria-label="Score ${c.score} out of 10"><b style="width:${c.score * 10}%"></b><s style="left:20%"></s><s style="left:50%"></s><s style="left:80%"></s></div>
+      <div class="ruler-key" aria-hidden="true"><span style="left:20%">2</span><span style="left:50%">5</span><span style="left:80%">8</span></div>
+      <p style="margin:.5rem 0 0">${esc(c.reasoning)}</p>
+      ${(c.evidence || []).map(x => `<div class="receipt"><span class="where">${esc(x.file)}:${esc(x.line ?? "?")}</span>${esc(x.quote)}</div>`).join("")}
+      ${c.low_evidence ? `<p class="lowev">No verified citation for this score${rv.mode.startsWith("heuristic") ? " (offline estimate)" : ""}. Treat it with caution.</p>` : ""}
+      ${(c.gaps || []).length ? `<ul class="plain">${(c.gaps || []).map(g => `<li>${esc(g)}</li>`).join("")}</ul>` : ""}${anchors}</section>`;
+  }).join("");
+  const sec = r.secrets, cm = r.commits, tm = r.team_match;
+  const sfind = (r.security.findings || []).slice(0, 25);
+  return `
+  <h1>${esc(r.meta.repo)}</h1>
+  <div class="row tiny muted" style="margin-top:6px"><a href="${esc(r.meta.url)}" target="_blank" rel="noopener">Open on GitHub</a><span>Reviewed ${ago(r.meta.evaluated_at)}</span><span>Review: ${esc(rv.mode)}</span><span>Confidence: ${esc(rv.confidence)}</span>${ev.cited ? `<span>${ev.verified} of ${ev.cited} citations verified against the code</span>` : ""}</div>
+  <div class="rhead" style="margin-top:20px"><div class="bigscore">${r.overall_score}<small>/100 technical</small></div></div>
+  ${rv.mode.startsWith("heuristic") ? `<div class="notice">Offline estimate: no Gemini key is configured, so scores come only from static signals and are rough. Add GEMINI_API_KEY for the cited review.</div>` : ""}
+  <p class="summary">${esc(rv.summary)}</p>
+  ${rv.what_it_does && rv.what_it_does !== "See README" ? `<dl class="kv"><dt>What it does</dt><dd>${esc(rv.what_it_does)}</dd>${rv.built_vs_reused ? `<dt>Built vs reused</dt><dd>${esc(rv.built_vs_reused)}</dd>` : ""}</dl>` : ""}
+  <h2>Before the hackathon started</h2>${renderPreEvent(r.pre_event)}
+  <h2>Flags for a human to check</h2><p class="muted tiny" style="margin:4px 0 0">Signals, not verdicts. Rewritten or squashed history can hide or fake any of them.</p>
+  ${flags.length ? flags.map(f => `<div class="flag ${esc(f.severity)}"><div><span class="sev">${esc(f.severity)}</span>${esc(f.message)}</div></div>`).join("") : `<p class="muted">Nothing raised.</p>`}
+  ${(rv.red_flags || []).length ? `<h3 style="margin-top:18px">Red flags from the code review</h3><ul class="plain">${li(rv.red_flags)}</ul>` : ""}
+  <h2>Pitch vs code</h2>${renderAlignment(r.alignment)}
+  <h2>Rubric review</h2><div class="ledger">${crit}</div>
+  <div class="cols"><div>${(rv.strengths || []).length ? `<h2>Strengths</h2><ul>${li(rv.strengths)}</ul>` : ""}</div><div>${(rv.weaknesses || []).length ? `<h2>Weaknesses</h2><ul>${li(rv.weaknesses)}</ul>` : ""}</div></div>
+  <div class="cols"><div>${(rv.brittleness_risks || []).length ? `<h2>How it could break</h2><ul>${li(rv.brittleness_risks)}</ul>` : ""}</div><div>${(rv.questions_for_team || []).length ? `<h2>Questions to ask the team</h2><ul>${li(rv.questions_for_team)}</ul>` : ""}</div></div>
+  ${tm ? `<h2>Team and committers</h2><dl class="kv"><dt>Matched</dt><dd>${tm.matched.length ? tm.matched.map(m => `${esc(m.member)} → ${esc(m.committer)} (${m.commits} commits)`).join("<br>") : "No listed member matches a committer"}</dd>${tm.silent_members.length ? `<dt>No commits</dt><dd>${tm.silent_members.map(esc).join(", ")}</dd>` : ""}${tm.unmatched_authors.length ? `<dt>Other committers</dt><dd>${tm.unmatched_authors.map(a => `${esc(a.name)} (${a.commits})`).join(", ")}</dd>` : ""}</dl>` : ""}
+  <h2>Secrets and environment</h2><dl class="kv"><dt>Scanner</dt><dd>${esc(sec.scanner)}</dd><dt>Findings</dt><dd>${sec.finding_count}</dd><dt>Files reading env vars</dt><dd>${sec.files_using_env_vars}</dd><dt>.env.example</dt><dd>${sec.has_env_example ? "yes" : "no"}</dd><dt>.env ignored by git</dt><dd>${sec.gitignore_covers_env ? "yes" : "no"}</dd></dl>
+  ${(sec.findings || []).slice(0, 10).map(f => `<div class="receipt"><span class="where">${esc(f.file)}:${esc(f.line)}</span>${esc(f.severity)} · ${esc(f.rule)} · ${esc(f.match)}</div>`).join("")}
+  <h2>Static security and robustness findings</h2>
+  ${sfind.length ? `<table><thead><tr><th>Severity</th><th>Finding</th><th>Where</th></tr></thead><tbody>${sfind.map(f => `<tr><td><span class="pill ${esc(f.severity)}">${esc(f.severity)}</span></td><td>${esc(f.message)}<div class="code muted tiny">${esc(f.snippet)}</div></td><td class="code">${esc(f.file)}:${f.line}</td></tr>`).join("")}</tbody></table>` : `<p class="muted">No patterns matched.</p>`}
+  <h2>Commit history</h2><dl class="kv"><dt>Commits</dt><dd>${cm.total_commits}</dd><dt>Authors</dt><dd>${cm.distinct_authors ?? "–"}</dd><dt>Active days</dt><dd>${cm.active_days ?? "–"} over ${cm.span_days ?? "–"} days</dd><dt>Largest commit</dt><dd>${cm.largest_commit ? `${cm.largest_commit.lines_added} lines (${Math.round(cm.largest_commit.share_of_all_added * 100)}% of all code)` : "–"}</dd><dt>Uninformative messages</dt><dd>${cm.low_information_message_share != null ? Math.round(cm.low_information_message_share * 100) + "%" : "–"}</dd></dl>`;
+}
+
+/* ---------- hackathons ---------- */
+async function viewEvents() {
+  const evs = await api("/api/events");
+  main(`<h1>Hackathons</h1><p class="lede">Create an event, add teams with their IDs and repositories, send each team its submission link, evaluate everything, and bring judges in to score.</p>
+    <form id="ef" style="margin:22px 0 6px"><div class="row" style="align-items:end"><label class="grow" style="flex:1 1 320px">Event name<input name="name" required maxlength="200" placeholder="e.g. Smart India Internal Round 2026"></label>
+      <label>Starts<input type="datetime-local" name="s"></label><label>Ends<input type="datetime-local" name="e"></label></div>
+      <div class="field"><label for="theme">Theme or problem statement <small>(optional; teams’ pitches are compared with it)</small></label><textarea id="theme" name="theme" style="min-height:70px"></textarea></div>
+      <p><button>Create hackathon</button></p></form>
+    <p class="muted tiny">Start and end times power the “started before the event” and “after the deadline” checks.</p>
+    <h2>Your hackathons</h2>
+    ${evs.length ? `<table><thead><tr><th>Name</th><th>Teams</th><th>Starts</th><th>Ends</th></tr></thead><tbody>${evs.map(e => `<tr class="link" data-go="#/event/${e.id}"><td><a href="#/event/${e.id}">${esc(e.name)}</a></td><td>${e.team_count}</td><td class="muted">${fmtDate(e.hackathon_start) || "not set"}</td><td class="muted">${fmtDate(e.hackathon_end) || "not set"}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No hackathons yet. Name your first one above, then add teams.</div>`}`);
+  $("#ef").onsubmit = async ev => {
+    ev.preventDefault(); const f = ev.target;
+    try { const e = await api("/api/events", { method: "POST", body: { name: f.name.value, hackathon_start: fromLocalInput(f.s.value), hackathon_end: fromLocalInput(f.e.value), theme: f.theme.value } }); location.hash = "#/event/" + e.id + "/import"; }
+    catch (x) { toast(x.message, true); }
+  };
+}
+
+const preCell = (r, startSet) => {
+  if (!startSet) return `<span class="muted tiny">set start time</span>`;
+  const p = r.pre_event; if (!p || !p.start_set) return r.score == null ? "" : `<span class="muted tiny">–</span>`;
+  if (!p.commits_before) return `<span class="pill ok">none</span>`;
+  const sev = (p.share_lines >= 0.3 || p.share_commits >= 0.5 || p.commits_before >= 10) ? "high" : "medium";
+  return `<span class="pill ${sev}">${p.commits_before} commits</span><div class="tiny muted">${Math.round(p.share_lines * 100)}% of the code</div>`;
+};
+const pitchCell = r => !r.has_deck ? `<span class="muted tiny">no deck</span>` :
+  (r.alignment_score != null ? `<div class="scorecell"><span>${r.alignment_score}</span></div>${r.claims_unsupported ? `<div class="tiny" style="color:var(--flag)">${r.claims_unsupported} not in code</div>` : ""}` : `<span class="pill run">${r.deck_slides} slides</span>`) +
+  (r.deck_newer_than_eval ? `<div class="tiny" style="color:var(--amber)">new deck: re-evaluate</div>` : "");
+
+async function viewEvent(id, tab = "leaderboard") {
+  const ev = await api("/api/events/" + id);
+  const head = `<div class="crumb"><a href="#/events">Hackathons</a></div><h1>${esc(ev.name)}</h1>
+    <div class="muted tiny" style="margin-top:6px">${ev.team_count} team${ev.team_count === 1 ? "" : "s"} · ${ev.hackathon_start ? fmtDate(ev.hackathon_start) + " to " + fmtDate(ev.hackathon_end) : "dates not set"}</div>
+    <nav class="tabs" aria-label="Sections">${[["leaderboard", "Leaderboard"], ["teams", "Teams"], ["import", "Add teams"], ["judges", "Judges"], ["rubric", "Rubric"], ["feedback", "Feedback"], ["settings", "Settings"]].map(([k, l]) => `<a href="#/event/${id}/${k}" ${tab === k ? 'aria-current="page"' : ""}>${l}</a>`).join("")}</nav>`;
+  const render = html => main(head + `<div id="tab">${html}</div>`);
+
+  if (tab === "leaderboard" || tab === "teams") {
+    const load = async (auto) => {
+      if (auto && userIsEditing()) return true;
+      const [teams, lb] = await Promise.all([api(`/api/events/${id}/teams`), api(`/api/events/${id}/leaderboard`)]);
+      const busy = teams.some(t => t.latest && ["queued", "running"].includes(t.latest.status));
+      if (tab === "leaderboard") {
+        const done = lb.rows.filter(r => r.score != null).length, startSet = lb.event.start_set;
+        render(`<div class="row" style="margin-top:16px"><button id="evall">Evaluate all teams</button><button class="quiet" id="evnew">Only teams not yet evaluated</button><span class="sp"></span>${busy ? '<span class="pill run">Evaluation in progress…</span>' : ""}<a class="btn quiet" style="background:transparent;color:var(--teal)" href="#" id="dlres">Download results (CSV)</a></div>
+          ${!startSet ? `<div class="notice" style="margin-bottom:0">No start time is set for this hackathon, so work done before the event can’t be flagged. <a href="#/event/${id}/settings">Set the start time</a>.</div>` : ""}
+          ${lb.rows.length && lb.provisional && done ? `<p class="muted tiny" style="margin:12px 0 0">Provisional ranking: based on AI technical scores only. Once judges submit scorecards, only teams with complete scorecards are ranked.</p>` : ""}
+          ${lb.rows.length ? `<table><thead><tr><th class="num">#</th><th>Team</th><th>Technical</th><th>Pitch match</th><th>Before event</th><th>Judges</th><th>Overall</th><th>Flags</th></tr></thead><tbody>${lb.rows.map(r => {
+            const t = teams.find(x => x.id === r.team_id), st = t && t.latest && t.latest.status !== "done" ? statusPill(t.latest) : "";
+            return `<tr class="link" data-go="#/team/${r.team_id}"><td class="num">${r.rank ?? "–"}</td><td><a href="#/team/${r.team_id}"><b>${esc(r.code)}</b> ${esc(r.name)}</a>${r.title ? `<div class="tiny">${esc(r.title)}</div>` : ""}<div class="tiny muted">${esc(repoName(r.repo_url)) || "No repository"}</div></td>
+              <td>${r.score != null ? scoreCell(r.score) : (st || '<span class="pill">Not evaluated</span>')}</td><td>${pitchCell(r)}</td><td>${preCell(r, startSet)}</td>
+              <td class="num">${r.judge_count || '<span class="muted">0</span>'}${r.max_spread >= 3 ? `<div class="tiny" style="color:var(--amber)" title="Judges disagree by ${r.max_spread} points on a criterion">disagree</div>` : ""}</td>
+              <td>${r.final != null ? scoreCell(r.final) + (r.complete ? "" : '<div class="tiny muted">partial</div>') : '<span class="muted">–</span>'}</td>
+              <td>${r.score != null ? flagPills(r.high_flags, r.medium_flags) : ""}${r.top_flag ? `<div class="tiny muted" style="max-width:26ch">${esc(r.top_flag)}</div>` : ""}</td></tr>`;
+          }).join("")}</tbody></table>` : `<div class="empty">No teams yet. <a href="#/event/${id}/import">Add teams</a> with their IDs and repository links.</div>`}
+          ${lb.overlaps.length ? `<h2>Identical code across teams</h2><table><thead><tr><th>Teams</th><th>Shared</th><th>Example</th></tr></thead><tbody>${lb.overlaps.map(o => `<tr><td><span class="pill ${esc(o.severity)}">${esc(o.a)} and ${esc(o.b)}</span></td><td>${Math.round(o.share_of_smaller * 100)}% of the smaller repo · ${o.shared_files} files</td><td class="code tiny">${o.examples.map(x => esc(x.a) + " = " + esc(x.b)).join("<br>")}</td></tr>`).join("")}</tbody></table>` : (done > 1 ? `<p class="muted tiny" style="margin-top:18px">No identical source files found across ${done} evaluated teams.</p>` : "")}
+          <div class="notice" style="margin-top:26px"><b>Scored by judges:</b> ${lb.human_criteria.map(c => esc(c.title) + " (" + c.weight + ")").join(", ") || "none"}. ${lb.judges ? `${lb.judges} judge${lb.judges === 1 ? "" : "s"} invited.` : `<a href="#/event/${id}/judges">Invite judges</a> to score them.`} The AI scores the rest from the repository.</div>`);
+        $("#evall").onclick = () => runAll({});
+        $("#evnew").onclick = () => runAll({ only_unevaluated: true });
+        $("#dlres").onclick = async e => { e.preventDefault(); try { const t = await api(`/api/events/${id}/results.csv`); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([t], { type: "text/csv" })); a.download = `results-${id}.csv`; a.click(); } catch (x) { toast(x.message, true); } };
+      } else {
+        render(`<table><thead><tr><th>Team ID</th><th>Name and project</th><th>Repository</th><th>Members</th><th>Pitch</th><th>Status</th><th></th></tr></thead><tbody>${teams.map(t => `<tr><td class="code"><b>${esc(t.code)}</b></td><td>${esc(t.name)}${t.project_title ? `<div class="tiny">${esc(t.project_title)}</div>` : ""}${t.summary ? "" : `<div class="tiny muted">no description yet</div>`}</td><td>${t.repo_url ? `<a href="${esc(t.repo_url)}" target="_blank" rel="noopener">${esc(repoName(t.repo_url))}</a>` : '<span class="pill medium">Missing</span>'}${t.cross_flags.length ? t.cross_flags.map(f => `<div class="tiny" style="color:var(--flag)">${esc(f.message)}</div>`).join("") : ""}</td><td class="tiny">${(t.members || []).map(m => esc(m.name) + (m.github ? ` <span class="muted">@${esc(m.github)}</span>` : "")).join("<br>")}</td>
+          <td class="tiny">${t.deck ? `<span class="pill ok">${t.deck.slides} slides</span><div class="muted">${esc(t.deck.filename)}</div>` : '<span class="pill">No deck</span>'}</td><td>${statusPill(t.latest) || (t.latest ? scoreCell(t.latest.overall_score) : "")}</td>
+          <td class="row"><button class="small quiet" data-act="eval" data-id="${t.id}" ${!t.repo_url ? "disabled" : ""}>Evaluate</button><button class="small quiet" data-act="link" data-id="${t.id}" title="The private page where this team uploads its deck and describes its project">Team link</button><button class="small quiet" data-act="edit" data-id="${t.id}">Edit</button><button class="small danger" data-act="del" data-id="${t.id}">Remove</button></td></tr>`).join("")}</tbody></table>${teams.length ? "" : `<div class="empty">No teams yet. <a href="#/event/${id}/import">Add teams</a>.</div>`}`);
+        window.__teams = teams;
+      }
+      if (!busy) clearPoll();
+      return busy;
+    };
+    const runAll = async body => {
+      try { const r = await api(`/api/events/${id}/evaluate`, { method: "POST", body }); toast(`Started ${r.started.length} evaluation(s)` + (r.skipped.length ? `; skipped ${r.skipped.map(s => s.team + " (" + s.reason + ")").join(", ")}` : "")); if (await load()) setPoll(() => load(true)); }
+      catch (x) { toast(x.message, true); }
+    };
+    if (await load()) setPoll(() => load(true));
+    window.__reload = async () => { if (await load()) setPoll(() => load(true)); };
+  } else if (tab === "import") {
+    render(`<h2 style="margin-top:20px">Add teams</h2>
+      <p class="lede">One row per team. Paste a CSV or upload a file. Team IDs you already use stay the same; rows with an existing ID update that team. Every team gets a private link where it can describe its project and upload its pitch deck.</p>
+      <p class="tiny muted">Columns: <span class="code">team_id, team_name, repo_url, members, project_title, description, problem</span> (the last three are optional; teams can fill them in themselves). Write members as <span class="code">Name (@githubhandle); Name (@handle)</span>. Handles let AuditCore check that the people listed actually committed.</p>
+      <textarea id="csv" spellcheck="false" aria-label="Teams CSV">team_id,team_name,repo_url,members,project_title,description,problem
+T-001,Team Alpha,https://github.com/owner/repo,Asha Rao (@asharao); Ravi K (@rk-dev),SafeRoute,"Maps that route women home along well-lit, busy streets","Commuters feel unsafe walking at night"
+T-002,Team Beta,https://github.com/owner/other-repo,Mia Chen (@miac),,,</textarea>
+      <div class="row" style="margin-top:10px"><input type="file" id="file" accept=".csv,text/csv" aria-label="Upload CSV"><span class="sp"></span><button id="imp">Import teams</button></div>
+      <h2>Or add one team</h2>
+      <form class="inline" id="tf"><label>Team ID<input name="code" placeholder="auto"></label><label>Name<input name="name"></label><label class="grow">Repository<input name="repo_url" placeholder="https://github.com/owner/repo"></label><label class="grow">Members<input name="members" placeholder="Asha Rao (@asharao); Ravi K (@rk-dev)"></label><button>Add team</button></form>`);
+    $("#file").onchange = async e => { const f = e.target.files[0]; if (f) $("#csv").value = await f.text(); };
+    $("#imp").onclick = async () => {
+      try { const r = await api(`/api/events/${id}/teams/import`, { method: "POST", body: { csv: $("#csv").value } });
+        if (r.problems.length) toast(`Imported ${r.created} new and ${r.updated} updated. Fix these on the Teams tab: ` + r.problems.map(p => `${p.team_id}: ${p.problem}`).join("; "), true);
+        else { toast(`Imported ${r.created} new and ${r.updated} updated teams`); location.hash = `#/event/${id}/teams`; } }
+      catch (x) { toast(x.message, true); }
+    };
+    $("#tf").onsubmit = async e => { e.preventDefault(); const f = e.target;
+      try { await api(`/api/events/${id}/teams`, { method: "POST", body: { code: f.code.value, name: f.name.value, repo_url: f.repo_url.value, members: members(f.members.value) } }); toast("Team added"); f.reset(); } catch (x) { toast(x.message, true); } };
+  } else if (tab === "judges") {
+    const load = async () => {
+      const js = await api(`/api/events/${id}/judges`);
+      render(`<h2 style="margin-top:20px">Judges</h2><p class="lede">Each judge gets a private link. They see every team’s evidence (flags, pre-event commits, pitch match, AI scores), then score the criteria. Where a judge’s score differs from the AI’s by more than a point they must say why. A judge can step out of any team they have a conflict with.</p>
+        <form class="inline" id="jf"><label class="grow">Judge name<input name="name" required maxlength="120" placeholder="e.g. Dr. Meera Rao"></label><button>Add judge</button></form>
+        ${js.length ? `<table><thead><tr><th>Judge</th><th>Progress</th><th>Private link</th><th></th></tr></thead><tbody>${js.map(j => { const url = location.origin + j.path; return `<tr><td><b>${esc(j.name)}</b></td><td class="tiny">${j.submitted} of ${j.teams} submitted${j.drafts ? `, ${j.drafts} draft` : ""}${j.recused ? `, ${j.recused} recused` : ""}</td><td><div class="linkbox"><input readonly value="${esc(url)}" aria-label="Link for ${esc(j.name)}"><button class="small quiet" data-copy="${esc(url)}">Copy</button></div></td><td><button class="small danger" data-deljudge="${j.id}">Remove</button></td></tr>`; }).join("")}</tbody></table><p class="muted tiny">Anyone with a link can score as that judge, so send each link only to that person.</p>` : `<div class="empty">No judges yet. Add one above to get their private scoring link.</div>`}`);
+      $("#jf").onsubmit = async e => { e.preventDefault(); try { await api(`/api/events/${id}/judges`, { method: "POST", body: { name: e.target.name.value } }); load(); } catch (x) { toast(x.message, true); } };
+      document.querySelectorAll("[data-copy]").forEach(b => b.onclick = () => copyText(b.dataset.copy, b.previousElementSibling));
+      document.querySelectorAll("[data-deljudge]").forEach(b => b.onclick = async () => { if (confirm("Remove this judge and their scores?")) { await api("/api/judges/" + b.dataset.deljudge, { method: "DELETE" }); load(); } });
+    };
+    await load();
+  } else if (tab === "rubric") {
+    const rb = ev.rubric, tot = rb.criteria.reduce((a, c) => a + (+c.weight || 0), 0);
+    render(`<h2 style="margin-top:20px">Scoring rubric</h2><p class="lede">Criteria marked AI are scored by AuditCore from the repository. The others are scored by judges because code cannot show them. Adjust weights to fit this event; changes apply to evaluations and scorecards from now on.</p>
+      <table><thead><tr><th>Criterion</th><th>Scored by</th><th class="num">Weight</th></tr></thead><tbody>${rb.criteria.map((c, i) => `<tr><td><b>${esc(c.title)}</b><div class="tiny muted" style="max-width:70ch">${esc(c.description)}</div></td><td>${c.ai_assisted === false ? '<span class="pill">Judge</span>' : '<span class="pill run">AI</span>'}</td><td class="num"><input type="number" min="0" step="1" value="${c.weight}" data-i="${i}" style="width:80px" aria-label="Weight for ${esc(c.title)}"></td></tr>`).join("")}</tbody></table>
+      <div class="row" style="margin-top:14px"><span id="tot" class="muted">Total weight ${tot}</span><span class="sp"></span><button id="save">Save weights</button></div>
+      <details style="margin-top:18px"><summary>Edit the full rubric as JSON (titles, descriptions, anchors)</summary><textarea id="rj" spellcheck="false" style="min-height:300px">${esc(JSON.stringify(rb, null, 2))}</textarea><p><button class="quiet" id="savej">Save JSON</button></p></details>`);
+    document.querySelectorAll("input[data-i]").forEach(i => i.oninput = () => { $("#tot").textContent = "Total weight " + [...document.querySelectorAll("input[data-i]")].reduce((a, x) => a + (+x.value || 0), 0); });
+    $("#save").onclick = async () => { document.querySelectorAll("input[data-i]").forEach(i => rb.criteria[+i.dataset.i].weight = +i.value || 0); try { await api(`/api/events/${id}/rubric`, { method: "PUT", body: rb }); toast("Rubric saved"); } catch (x) { toast(x.message, true); } };
+    $("#savej").onclick = async () => { try { await api(`/api/events/${id}/rubric`, { method: "PUT", body: JSON.parse($("#rj").value) }); toast("Rubric saved"); viewEvent(id, "rubric"); } catch (x) { toast(x.message, true); } };
+  } else if (tab === "feedback") {
+    render(`<h2 style="margin-top:20px">Share feedback with teams</h2><p class="lede">Each evaluation drafts feedback on the team’s page. Review it there and tick “Share with team” on what should go out. Teams then see it on their private link, and you can also download everything marked as shared.</p>
+      <p><a class="btn" href="#" id="dl">Download shared feedback (CSV)</a></p>`);
+    $("#dl").onclick = async e => { e.preventDefault(); try { const t = await api(`/api/events/${id}/feedback.csv`); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([t], { type: "text/csv" })); a.download = `feedback-${id}.csv`; a.click(); } catch (x) { toast(x.message, true); } };
+  } else if (tab === "settings") {
+    render(`<h2 style="margin-top:20px">Event settings</h2>
+      <form id="sf"><div class="row" style="align-items:end"><label style="flex:1 1 300px">Event name<input name="name" value="${esc(ev.name)}" required maxlength="200"></label>
+        <label>Starts<input type="datetime-local" name="s" value="${toLocalInput(ev.hackathon_start)}"></label><label>Ends<input type="datetime-local" name="e" value="${toLocalInput(ev.hackathon_end)}"></label></div>
+        <p class="muted tiny" style="margin:6px 0 0">Commits before the start time are flagged on every team; decks uploaded after the end time are flagged too.</p>
+        <div class="field"><label for="th">Theme or problem statement <small>(teams’ pitches are compared with it)</small></label><textarea id="th" name="theme">${esc(ev.theme || "")}</textarea></div>
+        <p><button>Save settings</button></p></form>
+      <p class="muted tiny">After changing the start time, evaluate teams again so the pre-event check uses it.</p>
+      <h2>Delete this hackathon</h2><p class="muted">Removes its teams, evaluations, feedback and judge scores permanently.</p><button class="danger" id="delev">Delete hackathon</button>`);
+    $("#sf").onsubmit = async e => { e.preventDefault(); const f = e.target; try { await api(`/api/events/${id}`, { method: "PATCH", body: { name: f.name.value, hackathon_start: fromLocalInput(f.s.value), hackathon_end: fromLocalInput(f.e.value), theme: f.theme.value } }); toast("Settings saved"); } catch (x) { toast(x.message, true); } };
+    $("#delev").onclick = async () => { if (confirm(`Delete “${ev.name}” and everything in it?`)) { await api("/api/events/" + id, { method: "DELETE" }); location.hash = "#/events"; } };
+  }
+}
+
+/* ---------- team ---------- */
+async function viewTeam(id) {
+  const typing = () => { const t = $("#ff textarea"); return !!(t && t.value.trim()); };
+  const load = async (auto) => {  // returns true while an evaluation is running
+    const t = await api("/api/teams/" + id); window.__teamEvent = t.event.id;
+    const run = t.running;
+    if (auto && (typing() || userIsEditing())) return run;  // never overwrite what someone is writing
+    const ev = t.evaluation, link = t.submit_path ? location.origin + t.submit_path : "";
+    const rubric = t.event.rubric.criteria, titles = Object.fromEntries(rubric.map(c => [c.id, c.title]));
+    main(`<div class="crumb"><a href="#/events">Hackathons</a> / <a href="#/event/${t.event.id}">${esc(t.event.name)}</a></div>
+      <div class="row"><h1><span class="code">${esc(t.code)}</span> ${esc(t.name)}</h1><span class="sp"></span>${run ? '<span class="pill run">Analysing…</span>' : `<button id="rerun" ${t.repo_url ? "" : "disabled"}>${ev ? "Evaluate again" : "Evaluate"}</button>`}</div>
+      <dl class="kv"><dt>Repository</dt><dd>${t.repo_url ? `<a href="${esc(t.repo_url)}" target="_blank" rel="noopener">${esc(repoName(t.repo_url))}</a>` : '<span class="pill medium">Missing</span> Add one on the Teams tab.'}</dd><dt>Members</dt><dd>${(t.members || []).map(m => esc(m.name) + (m.github ? ` (@${esc(m.github)})` : "")).join(", ") || '<span class="muted">none listed</span>'}</dd></dl>
+      ${t.cross_flags.map(f => `<div class="flag ${esc(f.severity)}"><div><span class="sev">${esc(f.severity)}</span>${esc(f.message)}</div></div>`).join("")}
+      ${t.history[0] && t.history[0].status === "failed" ? `<div class="notice err">Last evaluation failed: ${esc(t.history[0].error)}</div>` : ""}
+      ${t.deck_newer_than_eval ? `<div class="notice">A new deck was uploaded after the last evaluation. Evaluate again to include it in the pitch-vs-code check.</div>` : ""}
+
+      <h2>About the project</h2>
+      <form id="prof"><div class="field" style="margin-top:6px"><label for="pt">Project title</label><input id="pt" name="project_title" maxlength="200" value="${esc(t.project_title || "")}"></div>
+        <div class="field"><label for="ps">What is it about?</label><textarea id="ps" name="summary">${esc(t.summary || "")}</textarea></div>
+        <div class="field"><label for="pp">What problem does it solve?</label><textarea id="pp" name="problem_statement">${esc(t.problem_statement || "")}</textarea></div>
+        <p class="row"><button class="quiet">Save project details</button><span class="muted tiny">The team can edit these itself on its private link.</span></p></form>
+
+      <h2>Pitch deck</h2>
+      ${t.deck ? `<dl class="kv"><dt>File</dt><dd>${esc(t.deck.filename)} · ${t.deck.slides} slides · ${Math.round(t.deck.size / 1024)} KB · uploaded ${ago(t.deck.uploaded_at)}</dd></dl>
+        <details><summary>Read the slide text</summary>${(t.deck_slides || []).map(s => `<div class="fb"><b>Slide ${s.n}</b><pre>${esc(s.text) || "(no text)"}</pre>${s.notes ? `<div class="tiny muted">Speaker notes: ${esc(s.notes)}</div>` : ""}</div>`).join("")}</details>
+        <div class="row" style="margin-top:10px"><button class="small quiet" id="dldeck">Download original</button><button class="small danger" id="rmdeck">Remove deck</button></div>` : `<p class="muted">No deck yet. The team can upload one on its private link, or you can upload it here.</p>`}
+      <div class="row" style="margin-top:10px"><input type="file" id="deckfile" accept=".pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" aria-label="Upload deck"><button class="small" id="updeck">${t.deck ? "Replace deck" : "Upload deck"}</button></div>
+      <h3 style="margin-top:22px">Team’s private link</h3><div class="linkbox"><input readonly id="tl" value="${esc(link)}"><button class="small quiet" id="cplink">Copy</button></div>
+      <p class="muted tiny">The team opens this to describe its project, upload its deck and read feedback you share. Anyone with the link can edit the submission.</p>
+
+      <h2>Feedback</h2>
+      <div id="fb">${t.feedback.length ? t.feedback.map(f => `<div class="fb"><div class="row"><b>${esc(f.author)}</b><span class="pill ${f.kind === "ai" ? "run" : ""}">${f.kind === "ai" ? "AI draft" : "Judge"}</span><span class="muted tiny">${ago(f.created_at)}</span><span class="sp"></span><label class="row" style="font-weight:500"><input type="checkbox" data-share="${f.id}" ${f.visible_to_team ? "checked" : ""}> Share with team</label><button class="small danger" data-delfb="${f.id}">Delete</button></div><pre>${esc(f.body)}</pre></div>`).join("") : '<p class="muted">No feedback yet. The AI draft appears here after the first evaluation.</p>'}</div>
+      <form id="ff" style="margin-top:14px"><label>Add your own feedback<textarea name="body" required style="min-height:90px;font-family:var(--body);font-size:.95rem"></textarea></label>
+        <div class="row" style="margin-top:8px"><label style="font-weight:500;display:flex;gap:6px;align-items:center">Your name <input name="author" required value="${esc(store.get("ac_author") || "")}"></label><label class="row" style="font-weight:500"><input type="checkbox" name="share"> Share with team</label><button>Save feedback</button></div></form>
+
+      ${t.judge_scores.length ? `<h2>Judge scorecards</h2><table><thead><tr><th>Judge</th><th>Status</th>${rubric.map(c => `<th class="num" title="${esc(c.title)}">${esc(c.title.split(/[ &]/)[0])}</th>`).join("")}</tr></thead><tbody>${t.judge_scores.map(j => `<tr><td>${esc(j.judge)}${j.comment ? `<div class="tiny muted" style="max-width:30ch">${esc(j.comment)}</div>` : ""}</td><td>${j.conflict ? '<span class="pill">recused</span>' : `<span class="pill ${j.status === "submitted" ? "ok" : ""}">${esc(j.status)}</span>`}</td>${rubric.map(c => { const s = (j.scores || {})[c.id]; return `<td class="num">${s ? s.score : "–"}${s && s.note ? `<div class="tiny muted" style="max-width:18ch;text-align:left" title="${esc(s.note)}">note</div>` : ""}</td>`; }).join("")}</tr>`).join("")}</tbody></table>` : ""}
+      ${ev ? "<h2>Latest evaluation</h2>" + renderReport(ev.result, ev) : (run ? "" : '<div class="empty">Not evaluated yet.</div>')}`);
+    const rr = $("#rerun"); if (rr) rr.onclick = async () => { rr.disabled = true; try { await api(`/api/teams/${id}/evaluate`, { method: "POST" }); if (await load()) setPoll(() => load(true), 2500); } catch (x) { toast(x.message, true); rr.disabled = false; } };
+    $("#prof").onsubmit = async e => { e.preventDefault(); const f = e.target; try { await api("/api/teams/" + id, { method: "PATCH", body: { project_title: f.project_title.value, summary: f.summary.value, problem_statement: f.problem_statement.value } }); toast("Project details saved"); } catch (x) { toast(x.message, true); } };
+    $("#updeck").onclick = async () => { const f = $("#deckfile").files[0]; if (!f) return toast("Choose a .pptx or PDF file first", true); try { await api(`/api/teams/${id}/deck`, { method: "POST", body: { filename: f.name, data_b64: await fileB64(f) } }); toast("Deck uploaded"); load(); } catch (x) { toast(x.message, true); } };
+    const rm = $("#rmdeck"); if (rm) rm.onclick = async () => { if (confirm("Remove this deck?")) { await api(`/api/teams/${id}/deck`, { method: "DELETE" }); load(); } };
+    const dd = $("#dldeck"); if (dd) dd.onclick = async () => { const h = {}; const tk = store.get("ac_token"); if (tk) h.Authorization = "Bearer " + tk; const r = await fetch(`/api/teams/${id}/deck/file`, { headers: h }); if (!r.ok) return toast("Could not download the file", true); const a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob()); a.download = t.deck.filename; a.click(); };
+    $("#cplink").onclick = () => copyText(link, $("#tl"));
+    $("#ff").onsubmit = async e => { e.preventDefault(); const f = e.target; store.set("ac_author", f.author.value);
+      try { await api(`/api/teams/${id}/feedback`, { method: "POST", body: { author: f.author.value, body: f.body.value, visible_to_team: f.share.checked } }); await load(); } catch (x) { toast(x.message, true); } };
+    document.querySelectorAll("[data-share]").forEach(c => c.onchange = async () => { try { await api("/api/feedback/" + c.dataset.share, { method: "PATCH", body: { visible_to_team: c.checked } }); toast(c.checked ? "The team will see this on its link" : "Hidden from the team"); } catch (x) { toast(x.message, true); } });
+    document.querySelectorAll("[data-delfb]").forEach(b => b.onclick = async () => { if (!confirm("Delete this feedback?")) return; await api("/api/feedback/" + b.dataset.delfb, { method: "DELETE" }); load(); });
+    if (!run) clearPoll();
+    return run;
+  };
+  if (await load()) setPoll(() => load(true), 2500);
+}
+
+/* ---------- router + delegated actions ---------- */
+async function route() {
+  clearPoll();
+  const r = (location.hash.replace(/^#\/?/, "") || "quick").split("/");
+  renderNav(r);
+  try {
+    if (r[0] === "quick") await viewQuick();
+    else if (r[0] === "eval") await viewEval(+r[1]);
+    else if (r[0] === "events") await viewEvents();
+    else if (r[0] === "event") await viewEvent(+r[1], r[2] || "leaderboard");
+    else if (r[0] === "team") await viewTeam(+r[1]);
+    else location.hash = "#/quick";
+  } catch (x) { main(`<div class="notice err" role="alert">${esc(x.message)}</div>`); }
+  window.scrollTo(0, 0);
+}
+document.addEventListener("click", async e => {
+  const row = e.target.closest("tr[data-go]"); if (row && !e.target.closest("a,button,input")) { location.hash = row.dataset.go; return; }
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const id = +b.dataset.id, t = (window.__teams || []).find(x => x.id === id);
+  try {
+    if (b.dataset.act === "eval") { await api(`/api/teams/${id}/evaluate`, { method: "POST" }); toast("Evaluation started"); window.__reload && window.__reload(); }
+    else if (b.dataset.act === "link") { copyText(location.origin + t.submit_path); }
+    else if (b.dataset.act === "del") { if (confirm(`Remove ${t.code} ${t.name} and its evaluations?`)) { await api("/api/teams/" + id, { method: "DELETE" }); window.__reload(); } }
+    else if (b.dataset.act === "edit") {
+      const d = $("#dlg");
+      d.innerHTML = `<form method="dialog" id="ed"><h3>Edit ${esc(t.code)}</h3><label>Name<input name="name" value="${esc(t.name)}"></label><label style="margin-top:10px">Repository<input name="repo_url" value="${esc(t.repo_url || "")}" placeholder="https://github.com/owner/repo"></label>
+        <label style="margin-top:10px">Members<input name="members" value="${esc(membersStr(t.members))}"></label>
+        <label style="margin-top:10px">Project title<input name="project_title" value="${esc(t.project_title || "")}"></label>
+        <div class="row" style="margin-top:16px"><button value="ok">Save</button><button type="button" class="quiet" onclick="document.getElementById('dlg').close()">Cancel</button></div></form>`;
+      $("#ed").onsubmit = async ev => { const f = ev.target;
+        try { await api("/api/teams/" + id, { method: "PATCH", body: { name: f.name.value, repo_url: f.repo_url.value, members: members(f.members.value), project_title: f.project_title.value } }); window.__reload(); } catch (x) { toast(x.message, true); } };
+      d.showModal();
+    }
+  } catch (x) { toast(x.message, true); }
+});
+window.addEventListener("hashchange", route);
+(async () => {
+  try { health = await api("/api/health"); $("#health").innerHTML = `Review engine: ${health.gemini ? "Gemini" : "offline estimate (no Gemini key)"}`; } catch {}
+  route();
+})();
+</script>
+</body>
+</html>

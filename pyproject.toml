@@ -1,0 +1,27 @@
+[project]
+name = "auditcore"
+version = "0.1.0"
+description = "Evidence-backed evaluation of hackathon GitHub repositories"
+requires-python = ">=3.10"
+dependencies = []  # the CLI needs nothing; the dashboard needs the "server" extra
+
+[project.optional-dependencies]
+server = ["fastapi", "uvicorn", "sqlalchemy", "pypdf"]
+postgres = ["psycopg[binary]"]
+dev = ["pytest", "httpx", "python-pptx", "reportlab"]
+
+[project.scripts]
+auditcore = "auditcore.cli:main"
+auditcore-server = "auditcore.server:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "backend"}
+packages = ["auditcore", "auditcore.analyzers"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+pythonpath = ["backend"]

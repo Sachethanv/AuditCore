@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Your submission · AuditCore</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+</head>
+<body>
+<main class="hero" id="app" aria-live="polite"><p class="muted">Loading your submission…</p></main>
+<script src="/static/shared.js"></script>
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const tok = location.pathname.split("/").filter(Boolean).pop();
+const base = `/public/submit/${encodeURIComponent(tok)}`;
+const fileB64 = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = () => rej(new Error("Could not read the file")); r.readAsDataURL(f); });
+async function call(path, method = "GET", body) {
+  const r = await fetch(base + path, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "Something went wrong. Try again.");
+  return d;
+}
+function msg(text, err) { const n = $("#msg"); if (!n) return; n.className = "notice" + (err ? " err" : ""); n.textContent = text; n.hidden = !text; if (text) n.scrollIntoView({ block: "nearest" }); }
+
+function render(d) {
+  const t = d.team, p = d.profile, dk = d.deck;
+  document.title = `${t.code} ${t.name} · Your submission`;
+  $("#app").innerHTML = `
+    <a class="brand" href="#" style="pointer-events:none"><i></i>AuditCore</a>
+    <h1 style="margin-top:22px">${esc(t.name || t.code)}</h1>
+    <p class="lede">Team <b>${esc(t.code)}</b> · ${esc(d.event.name)}${d.event.ends_at ? ` · submissions close ${fmtDate(d.event.ends_at)}` : ""}</p>
+    ${d.after_deadline ? `<div class="notice">The submission deadline has passed. You can still make changes, but the organizers can see when they were made.</div>` : ""}
+    <div id="msg" class="notice" hidden role="status"></div>
+    ${d.event.theme ? `<details style="margin-top:14px"><summary>The event’s theme</summary><p style="white-space:pre-wrap">${esc(d.event.theme)}</p></details>` : ""}
+
+    <h2>About your project</h2>
+    <p class="muted" style="margin:.3rem 0 0">Judges read this next to your code. Say what the project really does today, not what you hope to build.</p>
+    <form id="pf">
+      <div class="field"><label for="pt">Project title</label><input id="pt" name="project_title" maxlength="200" value="${esc(p.project_title || "")}" autocomplete="off"></div>
+      <div class="field"><label for="ps">What is it about?</label><textarea id="ps" name="summary" maxlength="8000" placeholder="Two or three sentences: what it does and how a person uses it">${esc(p.summary || "")}</textarea></div>
+      <div class="field"><label for="pp">What problem does it solve?</label><textarea id="pp" name="problem_statement" maxlength="8000" placeholder="Who has the problem, and what happens to them today without your project">${esc(p.problem_statement || "")}</textarea></div>
+      <p><button id="savep">Save project details</button></p>
+    </form>
+
+    <h2>Pitch deck</h2>
+    ${dk ? `<p style="margin:.4rem 0"><span class="pill ok">Received</span> <b>${esc(dk.filename)}</b> · ${dk.slides} ${dk.kind === "pdf" ? "page" : "slide"}${dk.slides === 1 ? "" : "s"} · ${ago(dk.uploaded_at)}</p>` : `<p class="muted" style="margin:.3rem 0 0">No deck uploaded yet.</p>`}
+    <div class="dropzone" id="dz"><p style="margin:0 0 10px">Drop a <b>.pptx</b> or <b>PDF</b> here, or choose a file. Up to 20 MB. The text on your slides is read, so keep key points as text rather than only in images.</p>
+      <input type="file" id="deck" accept=".pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" aria-label="Choose your deck"> <button id="up" type="button">${dk ? "Replace deck" : "Upload deck"}</button></div>
+
+    <h2>Your repository</h2>
+    <p style="margin:.3rem 0">${t.repo_url ? `<a href="${esc(t.repo_url)}" target="_blank" rel="noopener">${esc(t.repo_url.replace("https://github.com/", ""))}</a> <span class="muted">· to change it, ask the organizers</span>` : `<span class="pill medium">Not set</span> <span class="muted">Ask the organizers to add your GitHub link.</span>`}</p>
+    ${t.members.length ? `<p class="muted tiny">Team members listed: ${t.members.map(esc).join(", ")}</p>` : ""}
+
+    <h2>Feedback for your team</h2>
+    ${d.feedback.length ? d.feedback.map(f => `<div class="fb"><div class="row"><b>${esc(f.author)}</b><span class="muted tiny">${ago(f.created_at)}</span></div><pre>${esc(f.body)}</pre></div>`).join("") : `<p class="muted">Nothing shared yet. Feedback appears here once the organizers release it.</p>`}
+    <p class="muted tiny" style="margin-top:34px">This page is private to your team. Anyone who has this link can edit your submission, so don’t share it outside your team.</p>`;
+
+  $("#pf").onsubmit = async e => { e.preventDefault(); const f = e.target, b = $("#savep"); b.disabled = true;
+    try { render(await call("/profile", "PUT", { project_title: f.project_title.value, summary: f.summary.value, problem_statement: f.problem_statement.value })); msg("Project details saved."); }
+    catch (x) { msg(x.message, true); b.disabled = false; } };
+  const send = async file => {
+    if (!file) return msg("Choose a .pptx or PDF file first.", true);
+    const b = $("#up"); b.disabled = true; b.textContent = "Uploading…";
+    try { render(await call("/deck", "POST", { filename: file.name, data_b64: await fileB64(file) })); msg("Deck received. Thank you."); }
+    catch (x) { msg(x.message, true); b.disabled = false; b.textContent = dk ? "Replace deck" : "Upload deck"; }
+  };
+  $("#up").onclick = () => send($("#deck").files[0]);
+  const dz = $("#dz");
+  dz.ondragover = e => { e.preventDefault(); dz.classList.add("over"); };
+  dz.ondragleave = () => dz.classList.remove("over");
+  dz.ondrop = e => { e.preventDefault(); dz.classList.remove("over"); send(e.dataTransfer.files[0]); };
+}
+call("").then(render).catch(x => { $("#app").innerHTML = `<a class="brand"><i></i>AuditCore</a><h1 style="margin-top:22px">This link doesn’t work</h1><p class="lede">${esc(x.message)}</p>`; });
+</script>
+</body>
+</html>

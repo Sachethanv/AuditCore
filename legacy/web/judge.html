@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Judging · AuditCore</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+</head>
+<body>
+<div class="sheet">
+  <aside id="side" aria-label="Teams"><p class="muted">Loading…</p></aside>
+  <main class="pane" id="pane" tabindex="-1"><p class="muted">Loading…</p></main>
+</div>
+<script src="/static/shared.js"></script>
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const code = location.pathname.split("/").filter(Boolean).pop();
+const base = `/public/judge/${encodeURIComponent(code)}`;
+let S = null, cur = null, D = null;
+async function call(path, method = "GET", body) {
+  const r = await fetch(base + path, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "Something went wrong. Try again.");
+  return d;
+}
+const STATUS = { "not started": ["", "Not started"], draft: ["medium", "Draft"], submitted: ["ok", "Submitted"], recused: ["", "Recused"] };
+const statusPill = s => { const [c, l] = STATUS[s] || ["", s]; return `<span class="pill ${c}">${l}</span>`; };
+function msg(text, err) { const n = $("#msg"); if (!n) return; n.className = "notice" + (err ? " err" : ""); n.textContent = text; n.hidden = !text; if (text) n.scrollIntoView({ block: "nearest" }); }
+
+function side() {
+  const done = S.teams.filter(t => t.my_status === "submitted" || t.my_status === "recused").length;
+  $("#side").innerHTML = `<a class="brand" href="#" style="pointer-events:none;margin-bottom:6px"><i></i>AuditCore</a>
+    <p style="margin:8px 4px 2px"><b>${esc(S.judge.name)}</b></p><p class="muted tiny" style="margin:0 4px 12px">${esc(S.event.name)} · ${done} of ${S.teams.length} done</p>
+    ${S.teams.map(t => `<a class="team" href="#t=${t.id}" ${cur === t.id ? 'aria-current="true"' : ""}><b>${esc(t.code)}</b> ${esc(t.name)}${t.title ? `<small>${esc(t.title)}</small>` : ""}<small>${statusPill(t.my_status)} ${t.technical != null ? `· AI ${t.technical}` : "· not analysed"}${t.high_flags ? ` · ${t.high_flags} high flag${t.high_flags > 1 ? "s" : ""}` : ""}</small></a>`).join("")}`;
+}
+
+function home() {
+  $("#pane").innerHTML = `<h1>${esc(S.event.name)}</h1><p class="lede">Welcome, ${esc(S.judge.name)}. Pick a team on the left. For each one you will see what AuditCore found in its code, what the team says about the project, and a scorecard.</p>
+    ${S.event.theme ? `<h2>Theme</h2><p style="white-space:pre-wrap;max-width:70ch">${esc(S.event.theme)}</p>` : ""}
+    <h2>How scoring works</h2>
+    <ul><li>The AI has already scored the technical criteria from the repository. Your box starts at the AI’s score; change it where you disagree.</li>
+    <li>If your score differs from the AI’s by more than a point, write a short reason. It is shown to the organizers.</li>
+    <li>Innovation, impact and demo are yours alone; the AI doesn’t score them.</li>
+    <li>If you know a team personally, tick the conflict box on its page and you won’t score it.</li></ul>
+    <p class="muted tiny">Flags are signals to check, not verdicts. Save a draft any time; submit when every criterion is scored.</p>`;
+}
+
+function render() {
+  const t = D.team, ev = D.evaluation, my = D.my, crit = S.criteria;
+  const aiBy = Object.fromEntries(((ev && ev.criteria) || []).map(c => [c.id, c]));
+  const flags = [...(D.cross_flags || []), ...((ev && ev.integrity_flags) || [])];
+  const li = a => (a || []).map(x => `<li>${esc(x)}</li>`).join("");
+  $("#pane").innerHTML = `
+    <div id="msg" class="notice" hidden role="status"></div>
+    <div class="row"><h1><span class="code">${esc(t.code)}</span> ${esc(t.name)}</h1><span class="sp"></span>${statusPill(my ? (my.conflict ? "recused" : my.status) : "not started")}</div>
+    ${t.title ? `<p style="margin:4px 0 0;font-size:1.1rem">${esc(t.title)}</p>` : ""}
+    <dl class="kv"><dt>Repository</dt><dd>${t.repo_url ? `<a href="${esc(t.repo_url)}" target="_blank" rel="noopener">${esc(t.repo_url.replace("https://github.com/", ""))}</a>` : "none"}</dd><dt>Members</dt><dd>${(t.members || []).map(esc).join(", ") || "not listed"}</dd></dl>
+
+    <h2>What the team says</h2>
+    <dl class="kv"><dt>About</dt><dd>${esc(t.summary) || '<span class="muted">not written yet</span>'}</dd><dt>Problem</dt><dd>${esc(t.problem_statement) || '<span class="muted">not written yet</span>'}</dd></dl>
+    ${ev && ev.what_it_does && ev.what_it_does !== "See README" ? `<dl class="kv"><dt>What the code does</dt><dd>${esc(ev.what_it_does)}</dd>${ev.built_vs_reused ? `<dt>Built vs reused</dt><dd>${esc(ev.built_vs_reused)}</dd>` : ""}</dl>` : ""}
+    ${!ev ? `<div class="notice">This team has not been analysed yet, so there is no AI evidence or score to start from.</div>` : ""}
+    ${ev ? `<h2>Flags to check</h2>${flags.length ? flags.map(f => `<div class="flag ${esc(f.severity)}"><div><span class="sev">${esc(f.severity)}</span>${esc(f.message)}</div></div>`).join("") : `<p class="muted">Nothing raised.</p>`}
+      <h2>Before the hackathon started</h2>${renderPreEvent(ev.pre_event)}
+      <h2>Pitch vs code</h2>${renderAlignment(ev.alignment)}
+      ${(ev.questions_for_team || []).length ? `<h2>Questions worth asking</h2><ul>${li(ev.questions_for_team)}</ul>` : ""}
+      ${(ev.red_flags || []).length ? `<h3 style="margin-top:18px">Red flags from the code review</h3><ul>${li(ev.red_flags)}</ul>` : ""}
+      <div class="cols"><div>${(ev.strengths || []).length ? `<h3 style="margin-top:18px">Strengths</h3><ul>${li(ev.strengths)}</ul>` : ""}</div><div>${(ev.weaknesses || []).length ? `<h3 style="margin-top:18px">Weaknesses</h3><ul>${li(ev.weaknesses)}</ul>` : ""}</div></div>` : ""}
+    ${D.deck && D.deck.slides ? `<details style="margin-top:18px"><summary>Read the deck (${D.deck.slides.length} slides)</summary>${D.deck.slides.map(s => `<div class="fb"><b>Slide ${s.n}</b><pre>${esc(s.text) || "(no text)"}</pre>${s.notes ? `<div class="tiny muted">Speaker notes: ${esc(s.notes)}</div>` : ""}</div>`).join("")}</details>` : `<p class="muted tiny" style="margin-top:14px">No deck was uploaded.</p>`}
+
+    <h2>Your scorecard</h2>
+    <form id="sc">
+      <label class="row" style="font-weight:600;margin:6px 0 12px"><input type="checkbox" id="cf" ${my && my.conflict ? "checked" : ""}> I have a conflict of interest with this team and won’t score it</label>
+      <div id="crits">${crit.map(c => {
+        const ai = aiBy[c.id], mine = my && my.scores && my.scores[c.id];
+        const val = mine ? mine.score : (ai ? ai.score : "");
+        return `<section class="crit" data-id="${esc(c.id)}" data-ai="${ai ? ai.score : ""}" data-w="${c.weight}">
+          <div class="score-row"><div><h3>${esc(c.title)} <span class="muted tiny">weight ${esc(c.weight)} · ${c.ai_assisted === false ? "your call" : "AI scored"}</span></h3><p class="muted" style="margin:.3rem 0 0">${esc(c.description)}</p></div>
+            <div style="text-align:right"><input class="numin" type="number" min="0" max="10" step="0.5" inputmode="decimal" value="${val}" aria-label="Your score for ${esc(c.title)}"><div class="tiny muted">/ 10</div></div></div>
+          ${c.anchors ? `<details><summary>What 2, 5 and 8 look like</summary><dl class="kv">${Object.entries(c.anchors).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl></details>` : ""}
+          ${ai ? `<p class="aiscore" style="margin:8px 0 0"><b>AuditCore gave ${ai.score}/10.</b> ${esc(ai.reasoning)}</p>${(ai.evidence || []).slice(0, 3).map(x => `<div class="receipt"><span class="where">${esc(x.file)}:${esc(x.line ?? "?")}</span>${esc(x.quote)}</div>`).join("")}${ai.low_evidence ? `<p class="lowev">The AI had no verified code citation for this score.</p>` : ""}` : ""}
+          <label class="field" style="margin-top:10px">Reason or note <small class="why"></small><textarea style="min-height:60px">${esc(mine ? mine.note : "")}</textarea></label></section>`;
+      }).join("")}</div>
+      <div class="field"><label for="cm">Overall comment <small>(optional, for the organizers)</small></label><textarea id="cm">${esc((my && my.comment) || "")}</textarea></div>
+      <div class="sticky-total"><span id="tot" style="font-weight:600"></span><span class="sp"></span><button type="button" class="quiet" id="draft">Save draft</button><button type="button" id="submit">Submit scores</button></div>
+    </form>`;
+  const crits = () => [...document.querySelectorAll("#crits .crit")];
+  const collect = () => {
+    const scores = {};
+    crits().forEach(el => { const v = el.querySelector("input").value; if (v !== "") scores[el.dataset.id] = { score: parseFloat(v), note: el.querySelector("textarea").value }; });
+    return scores;
+  };
+  const refresh = () => {
+    const conflict = $("#cf").checked; let num = 0, den = 0, n = 0;
+    crits().forEach(el => {
+      const inp = el.querySelector("input"), why = el.querySelector(".why"), ai = el.dataset.ai;
+      inp.disabled = el.querySelector("textarea").disabled = conflict;
+      el.style.opacity = conflict ? .5 : 1;
+      const v = parseFloat(inp.value);
+      if (!isNaN(v)) { num += v * +el.dataset.w; den += +el.dataset.w; n++; }
+      why.textContent = (!conflict && ai !== "" && !isNaN(v) && Math.abs(v - +ai) > 1) ? `(required: you differ from the AI’s ${ai} by more than 1)` : "";
+    });
+    $("#tot").textContent = conflict ? "You are recused from this team." : `Your weighted total: ${den ? (num / den * 10).toFixed(1) : "–"} / 100 · ${n} of ${crits().length} scored`;
+  };
+  $("#sc").addEventListener("input", refresh); $("#cf").addEventListener("change", refresh); refresh();
+  const save = async status => {
+    const conflict = $("#cf").checked;
+    ["draft", "submit"].forEach(i => $("#" + i).disabled = true);
+    try {
+      await call(`/teams/${t.id}/score`, "PUT", { scores: conflict ? {} : collect(), comment: $("#cm").value, conflict, status });
+      const row = S.teams.find(x => x.id === t.id); row.my_status = conflict ? "recused" : status;
+      D.my = { ...(D.my || {}), conflict, status, scores: collect(), comment: $("#cm").value };
+      side(); msg(conflict ? "Saved: you are recused from this team." : status === "submitted" ? "Scores submitted. You can still change them and submit again." : "Draft saved.");
+    } catch (x) { msg(x.message, true); }
+    ["draft", "submit"].forEach(i => $("#" + i).disabled = false);
+  };
+  $("#draft").onclick = () => save("draft");
+  $("#submit").onclick = () => save("submitted");
+}
+
+async function open(id) {
+  cur = id; side(); $("#pane").innerHTML = `<p class="muted">Loading team…</p>`;
+  try { D = await call(`/teams/${id}`); render(); window.scrollTo(0, 0); } catch (x) { $("#pane").innerHTML = `<div class="notice err">${esc(x.message)}</div>`; }
+}
+function route() { const m = location.hash.match(/t=(\d+)/); if (m) open(+m[1]); else { cur = null; if (S) { side(); home(); } } }
+window.addEventListener("hashchange", route);
+call("/session").then(s => { S = s; document.title = `Judging · ${s.event.name}`; side(); route(); if (!cur) home(); })
+  .catch(x => { $("#side").innerHTML = ""; $("#pane").innerHTML = `<a class="brand"><i></i>AuditCore</a><h1 style="margin-top:22px">This link doesn’t work</h1><p class="lede">${esc(x.message)}</p>`; });
+</script>
+</body>
+</html>

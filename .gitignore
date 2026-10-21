@@ -1,0 +1,32 @@
+# secrets (copy .env.example -> .env)
+.env
+.env.*
+!.env.example
+
+# python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+build/
+
+# node / frontend build (run `npm run build` in frontend/)
+node_modules/
+frontend/dist/
+dist/
+
+# local runtime data
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+reports/
+uploads/
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

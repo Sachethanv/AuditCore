@@ -1,0 +1,58 @@
+team_id,team_name,repo_url,members,project_title,description,problem,track,label,prize
+T01,OniBlock,https://github.com/oniblok/oniblock,,OniBlock,,,,prized,Uniswap Foundation - Best Uniswap Stack Contribution (3rd)
+T02,DayTrader,https://github.com/ETHTokyo2026-MODY/project-tokyo,,DayTrader,,,,prized,Curvegrid - Best RWA Tokenization Project (winner)
+T03,Lortnoc Tahc,https://github.com/forever8896/lortnoc_tahc,,Lortnoc Tahc,,,,prized,ENS - Best Integration of ENSv2 (2nd); World - Best IDKit Use Case
+T04,Radius,https://github.com/LeoFranklin015/ethtokyo-2026,,Radius,,,,prized,ENS - Best Integration of ENSv2 (1st)
+T05,Kagi Wallet,https://github.com/team-somehow/kagi-wallet,,Kagi Wallet,,,,prized,Intercepta - Safe Agent-to-Agent Payments with x402 (1st); Curvegrid - Best AI Agent Project
+T06,Wamia,https://github.com/HediKharouf0/Wamia,,Wamia,,,,prized,1inch - Build an Aqua App (2nd)
+T07,Surety,https://github.com/Rohitamalraj/Surety,,Surety,,,,prized,World - Best Use of World ID for Agents
+T08,Relay,https://github.com/derek2403/relay,,Relay,,,,prized,ENS - Best Use of ENSv2 (1st)
+T09,XSwap,https://github.com/Scannty/eth-blinks,,XSwap,,,,prized,Uniswap Foundation - Best Uniswap Stack Contribution (2nd); Intercepta
+T10,AntiScalper Protocol,https://github.com/altaga/AntiScalper-Protocol,,AntiScalper Protocol,,,,prized,"Sui - DeFi, Payments, Agents track (2nd)"
+T11,Placed,https://github.com/dzmbs/placed,,Placed,,,,prized,World - Best Use of IDKit (winner)
+T12,Tide,https://github.com/asengupta07/tide,,Tide,,,,unclear,list page showed a prize label but the project page lists none; excluded from statistics
+T13,ScalpLess,https://github.com/Shanthan2307/scalpless,,ScalpLess,,,,none,
+T14,Iceberg,https://github.com/SudeepGowda55/Iceberg,,Iceberg,,,,none,
+T15,Tap Pay,https://github.com/gitaugakwa/tap,,Tap Pay,,,,none,
+T16,Waterline,https://github.com/FlyingWHR/waterline,,Waterline,,,,none,
+T17,Axis,https://github.com/janhavidhepe89-pixel/AXIS,,Axis,,,,none,
+T18,Kismet,https://github.com/kismetcasa/Kismet,,Kismet,,,,none,
+T19,Tripwire,https://github.com/sigint-zero/tripwire,,Tripwire,,,,none,
+T20,KawaiPay,https://github.com/dumprahul/kawaipay,,KawaiPay,,,,none,
+T21,Ninja Check,https://github.com/tokyoksc/ninja-scan,,Ninja Check,,,,none,
+T22,DSAP Protocol,https://github.com/prathamesh-mutkure/agent-latch,,DSAP Protocol,,,,none,
+T24,My Agent Ohana,https://github.com/shakaleikaumaka/my-agent-ohana,,My Agent Ohana,,,,none,
+T25,RateSpace,https://github.com/AaronTan11/ratespace,,RateSpace,,,,none,
+T26,Mental Poker,https://github.com/henrikkv/poker,,Mental Poker,,,,none,
+T27,Dedan,https://github.com/UYUYANMARUL/dedan,,Dedan,,,,none,
+T28,AegisNet,https://github.com/shriyashsoni/aegisnet.eth,,AegisNet,,,,none,
+T29,nacre,https://github.com/Nishu0/nacre,,nacre,,,,none,
+T30,Buckets,https://github.com/SHLOK333/Spendkey,,Buckets,,,,none,
+T31,Bonded,https://github.com/Narayanan-D-05/Bonded,,Bonded,,,,none,
+T32,Agent's List,https://github.com/mi1kandcookies/agents-list,,Agent's List,,,,none,
+T33,Dead or Alive Agent,https://github.com/tricodex/doa-agent,,Dead or Alive Agent,,,,none,
+T34,Swish,https://github.com/Khalid-000-ME/swish,,Swish,,,,none,
+T35,Cypher Brain,https://github.com/Masashi-Ono0611/cypher-brain,,Cypher Brain,,,,none,
+T36,yuin,https://github.com/agoston0x/yuin,,yuin,,,,none,
+T37,AICity,https://github.com/kon-rad/ethtokyo2026,,AICity,,,,none,
+T38,MynaHealth,https://github.com/uooooo/myna-health,,MynaHealth,,,,none,
+T39,Levarac,https://github.com/levarac/mizar,,Levarac,,,,none,
+T40,Kakunin,https://github.com/SamirStream/kakunin,,Kakunin,,,,none,
+T41,suica os,https://github.com/fabianferno/ethglobal-tokyo-2026,,suica os,,,,none,lists prize tracks entered but no prize won
+T42,Agent Bank,https://github.com/takupeso/agent-bank,,Agent Bank,,,,none,
+T43,Phinary,https://github.com/oynozan/phinary,,Phinary,,,,none,
+T44,Zigel,https://github.com/aspiringsecurity/EthTransport,,Zigel,,,,none,
+T45,Hank0,https://github.com/bertankofon/Hanko,,Hank0,,,,none,
+T46,IC Pay,https://github.com/akashbiswas0/IC-Pay,,IC Pay,,,,none,
+T47,MD Transfer Protocol,https://github.com/capsulizers/mdtp,,MD Transfer Protocol,,,,none,
+T49,Plain Safe,https://github.com/gskril/plainsafe,,Plain Safe,,,,none,
+T50,TradeBridge,https://github.com/blackduff32/TradeBridge,,TradeBridge,,,,none,
+T51,hanko,https://github.com/sunagi/hanko,,hanko,,,,none,
+T52,Handshake,https://github.com/George-WM/handshake,,Handshake,,,,none,
+T54,consent-ledger,https://github.com/sakuraozation/consent-ledger,,consent-ledger,,,,none,
+T55,BioAgent,https://github.com/Polonity/ethglobaltokyo2026-bio-agent,,BioAgent,,,,none,
+T56,Risksir,https://github.com/angelphoon7/ethonline20266,,Risksir,,,,none,
+T57,Sodera,https://github.com/garguelles/sodera,,Sodera,,,,none,
+T58,Fan Fare,https://github.com/TheGreatFellow/fan-fare-eth-tokyo,,Fan Fare,,,,none,
+T59,Kido,https://github.com/austinjeremiah/Kido,,Kido,,,,none,
+T61,Accord,https://github.com/hrsh22/ethtokyo26,,Accord,,,,none,
